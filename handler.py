@@ -63,7 +63,6 @@ class MainPage(webapp2.RequestHandler):
 		
 		# Get the information from the Google Calendar
 		week_calendar = self.getCalendar(nickname, year)
-		logging.info(week_calendar)
 		template_values = {
 			'calendar': week_calendar,
 		}
@@ -78,6 +77,7 @@ class MainPage(webapp2.RequestHandler):
 		timeMax = str(year + 1) + '-01-01T00:00:00Z'
 		request = service.events().list(calendarId = settings.CALENDAR_ID, timeMin = timeMin, timeMax = timeMax)
 		events = request.execute(http=http)
+		logging.info(events)
 		return events
 	
 	def getEvents2(self, year):
@@ -85,9 +85,9 @@ class MainPage(webapp2.RequestHandler):
 				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-01'}, 'end': {'date': '2015-01-01'}},
 				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-07'}, 'end': {'date': '2015-01-07'}},
 				{'summary': 'leave', 'creator': {'email': 'minchan.kim@gmail.com'}, 'start': {'date': '2015-01-08'}, 'end': {'date': '2015-01-07'}},
-				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'datetime': '2015-01-02T09:00:00Z'}, 'end': {'datetime': '2015-01-02T15:00:00Z'}},
-				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'datetime': '2015-01-06T11:00:00Z'}, 'end': {'datetime': '2015-01-06T18:00:00Z'}},
-				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'datetime': '2015-01-09T09:00:00Z'}, 'end': {'datetime': '2015-01-09T15:00:00Z'}},
+				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-02T09:00:00Z'}, 'end': {'dateTime': '2015-01-02T15:00:00Z'}},
+				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-06T11:00:00Z'}, 'end': {'dateTime': '2015-01-06T18:00:00Z'}},
+				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T15:00:00Z'}},
 				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-18'}},
 			]}
 		return events
@@ -96,7 +96,7 @@ class MainPage(webapp2.RequestHandler):
 	def getCalendar(self, nickname, year):
 		holiday_calendar = self.initHolidayCalendar()
 		week_calendar = self.initWeekCalendar(year)
-		events = self.getEvents2(year)
+		events = self.getEvents(year)
 		
 		while 1:
 			if 'items' not in events:
@@ -133,7 +133,7 @@ class MainPage(webapp2.RequestHandler):
 				If it is the holiday or full-day leave, then the working hour of that week should be decreased by 8.
 				If it is the half-day leave, then the workiing hour of that week should be decreased by 4.
 				"""
-				if 'date' in start:		# Only all-day events will have 'date' field. (Other events will have 'datetime' field instead.)
+				if 'date' in start:		# Only all-day events will have 'date' field. (Other events will have 'dateTime' field instead.)
 					month = int(start['date'][5:7])
 					day = int(start['date'][8:10])
 					
@@ -162,10 +162,12 @@ class MainPage(webapp2.RequestHandler):
 							week_calendar[w][3] -= 4			# then we have to decrease the working hours by 4 for that week
 							holiday_calendar[month][day] = type	# and also have to mark it as the half-day leave
 				
-				# If the event is not a full-day event and the creator is the current user, then we have to update the week_calendar accordingly """
+				# If the event is not a full-day event and the creator is the current user, then we have to update the week_calendar accordingly
 				elif ('email' in creator) and (creator['email'] == (nickname + '@gmail.com')):
-					sdt = self.getDateTimeFromISO(start['datetime'])
-					edt = self.getDateTimeFromISO(end['datetime'])
+					logging.info(start)
+					logging.info(end)
+					sdt = self.getDateTimeFromISO(start['dateTime'])
+					edt = self.getDateTimeFromISO(end['dateTime'])
 					timedelta = edt - sdt
 					sd = sdt.date()
 					w = self.getWeekOfYear(year, sd)
