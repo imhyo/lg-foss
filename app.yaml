@@ -1,0 +1,22 @@
+application: lg-foss
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /stylesheets
+  static_dir: views/stylesheets  
+
+- url: /images
+  static_dir: views/images
+  
+- url: /.*
+  script: handler.application
+  login: required
+  
+libraries:
+- name: webapp2
+  version: latest
+- name: jinja2
+  version: latest
