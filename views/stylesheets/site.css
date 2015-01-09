@@ -1,0 +1,129 @@
+body {
+	font-family: Arial, Verdana,sans-serif, "MS PGothic";
+	font-size:1em;
+	color :#666666;
+	line-height:1.67;
+	background:#fff;
+}
+
+.main {
+	width:770x;
+	margin:1em;
+	text-align:center;
+}
+
+
+#header {
+	display:block;
+	width:770px;
+	margin:0.5em auto;
+	overflow:hidden;
+	text-align:center;
+	color: #58ADE3;
+}
+
+
+#header h1 {
+	margin: auto;
+	font: bold;
+	text-align:center;
+}
+
+
+footer {
+	display:block;
+	margin:32px auto 12px;
+	font-size:90%;
+	text-align:center;
+	line-height:1.2;
+}
+
+
+#list table {
+    border-collapse: collapse;
+    width: 36em;
+    border: 2px solid #a5a5a5;
+	text-align:center;
+	vertical-align:top;
+}
+
+#list col{
+    border-right: 1px solid #a5a5a5;
+}
+
+
+#list thead{
+    background-color: #ddd;
+    border-top: 1px solid #a5a5a5;
+    border-bottom: 1px solid #a5a5a5;
+}
+
+#list th{
+    background-color: #ddd;
+    font-weight: normal;
+    text-align: center;
+}
+
+#list #artistNumHead{
+    text-indent: -1000em;
+}
+
+#list .odd{
+    background-color:#edf5ff;
+	color: black
+}
+
+#list tr {
+	border-bottom: 1px dotted #a5a5a5;
+}
+
+#list tr:hover{
+    background-color: #3d80df;
+    color: #fff;
+}
+
+#list thead tr:hover, tfoot tr:hover{
+    background-color: transparent;
+    color: inherit;
+}
+
+#list thead td {
+    border-right: 1px solid #a5a5a5;
+}
+
+#list td {
+    border-right: 1px solid #a5a5a5;
+}
+
+
+#year {
+	width: 4em;
+}
+
+#container {
+	margin: 1em;
+}
+
+#container caption {
+	font-family: sans-serif;
+	font: 1.7em bold;
+	margin: 0.2em;
+}
+
+#container td {
+	vertical-align:top;
+	padding: 0em 0.5em
+}
+
+#message {
+	color: red;
+	font: bold;
+}
+
+#period {
+	width: 15em;
+}
+
+#hours {
+	width: 10em;
+}

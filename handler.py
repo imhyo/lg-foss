@@ -11,11 +11,19 @@ from oauth2client.appengine import OAuth2Decorator
 import settings
 
 
+''' Jinja is a templating language for Python.
+Using Jinja, Python code can be embedded into the html file to dynamically construct
+html contents.
+JINJA_ENVIRONMENT is used to request displaying Jina-based html file.
+''' 
 JINJA_ENVIRONMENT = jinja2.Environment(
 	loader = jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__), 'views')),
 	extensions = ['jinja2.ext.autoescape'],
 	autoescape = True)
 
+''' decorator is a variable used to request the OAuth2 authentication.
+This is used to request calendar events from Google Calendar Service.
+'''
 decorator = OAuth2Decorator(
 	client_id=settings.CLIENT_ID,
 	client_secret=settings.CLIENT_SECRET,
@@ -65,11 +73,13 @@ class MainPage(webapp2.RequestHandler):
 		week_calendar = self.getCalendar(nickname, year)
 		template_values = {
 			'calendar': week_calendar,
+			'year': year
 		}
 		
 		template = JINJA_ENVIRONMENT.get_template('index.html')
 		self.response.write(template.render(template_values))
 
+	# This function get calendar events of the 'year'
 	@decorator.oauth_required
 	def getEvents(self, year):
 		http = decorator.http()
@@ -77,26 +87,35 @@ class MainPage(webapp2.RequestHandler):
 		timeMax = str(year + 1) + '-01-01T00:00:00Z'
 		request = service.events().list(calendarId = settings.CALENDAR_ID, timeMin = timeMin, timeMax = timeMax)
 		events = request.execute(http=http)
-		logging.info(events)
 		return events
 	
+	# REST request to Google Calendar doesn't work when the app is runnig in the AppEngine SDK environment.
+	# This function is the stub function which is used to test this app without deploying to the server.
+	# This function returns fake 'events' similar to the events retrieved from Google Calendar.
 	def getEvents2(self, year):
 		events = {'items': [
 				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-01'}, 'end': {'date': '2015-01-01'}},
 				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-07'}, 'end': {'date': '2015-01-07'}},
-				{'summary': 'leave', 'creator': {'email': 'minchan.kim@gmail.com'}, 'start': {'date': '2015-01-08'}, 'end': {'date': '2015-01-07'}},
-				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-02T09:00:00Z'}, 'end': {'dateTime': '2015-01-02T15:00:00Z'}},
-				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-06T11:00:00Z'}, 'end': {'dateTime': '2015-01-06T18:00:00Z'}},
-				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T15:00:00Z'}},
-				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-18'}},
+				{'summary': 'leave', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-01-08'}, 'end': {'date': '2015-01-07'}},
+				{'summary': 'leave', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-02'}, 'end': {'date': '2015-01-07'}},
+				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-02T09:00:00Z'}, 'end': {'dateTime': '2015-01-02T17:00:00Z'}},
+				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-06T11:00:00Z'}, 'end': {'dateTime': '2015-01-06T18:00:00Z'}},
+				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T15:00:00Z'}},
+				{'summary': 'holiday', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-18'}},
 			]}
 		return events
 		
-		
+	# This function gets Google Calendar Events and analyze them to construct week_calendar data structure
 	def getCalendar(self, nickname, year):
 		holiday_calendar = self.initHolidayCalendar()
 		week_calendar = self.initWeekCalendar(year)
-		events = self.getEvents(year)
+		
+		# If the nickname is 'test', then use the fake events instead of requesting Google Calendar Service
+		# Because requesting to Google Calendar doesn't work when this app is running in the AppEngine SDK environment
+		if nickname == 'test':
+			events = self.getEvents2(year)
+		else:
+			events = self.getEvents(year)
 		
 		while 1:
 			if 'items' not in events:
@@ -164,8 +183,6 @@ class MainPage(webapp2.RequestHandler):
 				
 				# If the event is not a full-day event and the creator is the current user, then we have to update the week_calendar accordingly
 				elif ('email' in creator) and (creator['email'] == (nickname + '@gmail.com')):
-					logging.info(start)
-					logging.info(end)
 					sdt = self.getDateTimeFromISO(start['dateTime'])
 					edt = self.getDateTimeFromISO(end['dateTime'])
 					timedelta = edt - sdt
@@ -228,7 +245,11 @@ class MainPage(webapp2.RequestHandler):
 			
 		return week_calendar[0:w+1]
 		
-		
+	''' This converts ISO formatted datetime string to datetime data structure.
+	Please refer to RFC3339 for the format.
+	example: 2015-01-01T09:00:00Z (Jan 1, 2015, 9 am)
+	         2015-01-01T09:00:00+09:00 (Jan 1, 2015, 9am, GMT+9 time)
+	'''
 	def getDateTimeFromISO(self, str):
 		year = int(str[0:4])
 		month = int(str[5:7])
@@ -241,11 +262,15 @@ class MainPage(webapp2.RequestHandler):
 		return dt
 		
 
+	''' This function rounds up the calculated working hours for user-friendly displaying.
+	(ex. 27.134 --> 27.1)
+	'''
 	def roundWorkingHours(self, week_calendar):
 		for week in week_calendar:
 			week[2] = round(week[2], 1)
 
 
+	# This function gets the week of year for the given date
 	def getWeekOfYear(self, year, date):
 		new_year = datetime.date(year, 1, 1)
 		monday = new_year - datetime.timedelta(1) * new_year.weekday()
@@ -265,11 +290,16 @@ class NoAuthority(webapp2.RequestHandler):
 		template = JINJA_ENVIRONMENT.get_template('error.html')
 		self.response.write(template.render(template_values))
 			
-		
 
+class Logout(webapp2.RequestHandler)			:
+	def get(self):
+		logout_url = users.create_logout_url('/')
+		self.redirect(logout_url)
+
+		
 application = webapp2.WSGIApplication([
 	('/', MainPage),
-	('/dashboard', MainPage),
 	('/no_authority', NoAuthority),
+	('/logout', Logout),
 	(decorator.callback_path, decorator.callback_handler()),
 ], debug=True)

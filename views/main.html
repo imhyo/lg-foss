@@ -1,48 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8"/>
-	<link rel="stylesheet" type="text/css" href="stylesheets/normalize.css">
-    <title>{% block title %}LG Foss Work Management{% endblock %}</title>
-  </head>
+	<head>
+		<meta charset="utf-8"/>
+		<link rel="stylesheet" type="text/css" href="stylesheets/normalize.css">
+		<link rel="stylesheet" type="text/css" href="stylesheets/site.css">
+		<title>{% block title %}Foss Work Management{% endblock %}</title>
+	</head>
 
-  <body>
-  
-  <div id="header">
-	<h1>
-		LG Foss Work Management
-	</h1>
-  </div>
+	<body>
+		<div id="header">
+			<h1>
+				Foss Work Management
+			</h1>
+		</div>
 
-	<div class="main">
+		<div class="main">
+			<div id="message">
+				{% block message %}
+				{{ message }}
+				{% endblock %}
+			</div>
 
-		<font color="red">
-		{% block message %}
-		{{ message }}
-		{% endblock %}
-		</font>
+			{% block maincontent %}
+			{% endblock %}
+		</div>
 
-		<br>
+		<div>
+			<footer>
+				<hr>
+				<p>
+					<a href="/logout">Logout</a>
+					|
+					<a href="http://calendar.google.com">Google Calendar</a>
+				</p>
+				<p>
+					Copyright: Im, Hyo-Jun
+				</p>
+			</footer>
+		</div>
 
-		{% block maincontent %}
-		{% endblock %}
-	</div>
-
-  <div>
-    <footer>
-      <hr/>
-      <p>
-        <a href="/logout">Logout</a>
-        |
-        <a href="/">Home</a>
-        |
-        <a href="/dashboard">Dashboard</a>
-        |
-      </p>
-    </footer>
-  </div>
-
-
-  </body>
+	</body>
 </html>
-

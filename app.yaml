@@ -10,6 +10,9 @@ handlers:
 
 - url: /images
   static_dir: views/images
+
+- url: /fonts
+  static_dir: views/fonts
   
 - url: /.*
   script: handler.application

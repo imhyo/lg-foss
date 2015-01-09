@@ -1,18 +1,36 @@
 {% extends "main.html" %}
 
 {% block maincontent %}
-	<form name="dashboard" action="dashboard" method="post" onsubmit="return validateForm()">
-	<input type="text" name="year" size="20">
-	<input type="submit" value="Submit">
+	<form name="year_form" action="/" method="post" onsubmit="return validateForm()">
+		Year: <input type="text" name="year"" autofocus>
+		<input type="submit" value="Submit">
 	</form>
 	
-	<ul>
+	<center><div id = "container"><table>
+	<caption>{{ year }}</caption><tr>
+		{% set w = 0 %}
 		{% for week in calendar %}
-			<li>
-				{{ week[0].strftime('%b %d') }} ~ {{ week[1].strftime('%b %d') }}: {{ week[2] }} / {{ week[3] }}
-			</li>
+			{% if w%20 == 0 %}
+				{% if w > 0 %}
+					</tbody></table></div></td>
+				{% endif %}
+				<td><div id="list"><table rules="cols" >
+				<colgroup><col id="period" /><col id="hours" /></colgroup>
+				<thead><tr><th scope="col">Period</th><th scope="col">Working Hours</th></tr></thead>
+				<tbody>
+				
+			{% endif %}
+			<tr {% if week[2] < week[3] %} class="odd" {% endif %}>
+				<td>
+					{{ week[0].strftime('%b %d') }} ~ {{ week[1].strftime('%b %d') }}
+				</td>
+				<td>
+					{{ week[2] }} / {{ week[3] }}
+				</td>
+			</tr>
+			{% set w = w + 1 %}
 		{% endfor %}
-	</ul>
+	</tbody></table></div></td></tr></table></div></center>
 	
 	<script>
 	function validateForm()
