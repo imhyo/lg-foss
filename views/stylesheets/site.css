@@ -29,6 +29,11 @@ body {
 	text-align:center;
 }
 
+#header_link:link, #header_link:visited {
+	color: #58ADE3;
+	text-decoration: none;
+}
+
 
 footer {
 	display:block;
@@ -41,7 +46,7 @@ footer {
 
 #list table {
     border-collapse: collapse;
-    width: 36em;
+    width: 20em;
     border: 2px solid #a5a5a5;
 	text-align:center;
 	vertical-align:top;
@@ -121,9 +126,9 @@ footer {
 }
 
 #period {
-	width: 15em;
+	width: 12em;
 }
 
 #hours {
-	width: 10em;
+	width: 8em;
 }

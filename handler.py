@@ -31,6 +31,23 @@ decorator = OAuth2Decorator(
 
 service = build('calendar', 'v3')
 
+
+def showError(self, message):
+	template_values = {
+		'message': message
+	}
+	template = JINJA_ENVIRONMENT.get_template('error.html')
+	self.response.write(template.render(template_values))
+
+	
+def showWarning(self, message):
+	template_values = {
+		'message': message
+	}
+	template = JINJA_ENVIRONMENT.get_template('index.html')
+	self.response.write(template.render(template_values))
+
+
 """ This is the decorator function which is called just before the function which
 has '@auth_required' just before the function definition.
 This checks if the current user is in settings.USERS list. """
@@ -38,13 +55,13 @@ def auth_required(handler):
 	def check_login(self, *args, **kwargs):
 		nickname = users.get_current_user().nickname()
 		if nickname not in settings.USERS:
-			self.redirect("/no_authority")
+			showError(self, 'You don\'t have permission to this site. Please ask the administrator.')
 		else:
 			return handler(self, *args, **kwargs)
 
 	return check_login
 
-
+	
 """ Handler for the '/' page """	
 class MainPage(webapp2.RequestHandler):
 	@auth_required
@@ -53,6 +70,7 @@ class MainPage(webapp2.RequestHandler):
 		
 	@auth_required
 	def post(self):
+		logging.debug("Post")
 		self.showDashboard()
 	
 	""" This function shows the dashboard which shows the actual working hour / official working hour for each week of the year,
@@ -65,7 +83,11 @@ class MainPage(webapp2.RequestHandler):
 			year = datetime.date.today().year
 		else:
 			year = int(year_str)
-			
+		
+		if year < 1900 or year > 9999:
+			showError(self, 'Year should be between 1900 and 9999.')
+			return
+
 		if not nickname:
 			nickname = user.nickname()
 		
@@ -173,7 +195,7 @@ class MainPage(webapp2.RequestHandler):
 					# Update the holiday_calendar and week_calendar accordingly
 					date = datetime.date(year, month, day)
 					w = self.getWeekOfYear(year, date)
-					if w < len(week_calendar):
+					if w >= 0 and w < len(week_calendar):
 						if holiday_calendar[month][day] == 0:			# If the day was a weekday previously,
 							week_calendar[w][3] -= type * 4		# then we have to decrease the working hours for that week
 							holiday_calendar[month][day] = type	# and also have to mark it as the holiday.
@@ -188,7 +210,7 @@ class MainPage(webapp2.RequestHandler):
 					timedelta = edt - sdt
 					sd = sdt.date()
 					w = self.getWeekOfYear(year, sd)
-					if w < len(week_calendar):
+					if w >= 0 and w < len(week_calendar):
 						week_calendar[w][2] += timedelta.total_seconds() / 3600.0	# Increase the actual working hour for that week (by unit of hour)
 						
 			""" When there are too many events in Google Calendar, then Google Calendar service will send the
@@ -277,29 +299,16 @@ class MainPage(webapp2.RequestHandler):
 		t = date - monday
 		return (t.days/7)
 		
-			
 
-	
 
-class NoAuthority(webapp2.RequestHandler):
-	def get(self):
-		template_values = {
-			'message': 'You don\'t have permission to this site. Please ask the administrator.'
-		}
-		
-		template = JINJA_ENVIRONMENT.get_template('error.html')
-		self.response.write(template.render(template_values))
-			
-
-class Logout(webapp2.RequestHandler)			:
+class Logout(webapp2.RequestHandler):
 	def get(self):
 		logout_url = users.create_logout_url('/')
 		self.redirect(logout_url)
 
-		
+
 application = webapp2.WSGIApplication([
 	('/', MainPage),
-	('/no_authority', NoAuthority),
 	('/logout', Logout),
 	(decorator.callback_path, decorator.callback_handler()),
 ], debug=True)

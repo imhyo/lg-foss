@@ -13,7 +13,7 @@ handlers:
 
 - url: /fonts
   static_dir: views/fonts
-  
+
 - url: /.*
   script: handler.application
   login: required
