@@ -70,7 +70,6 @@ class MainPage(webapp2.RequestHandler):
 		
 	@auth_required
 	def post(self):
-		logging.debug("Post")
 		self.showDashboard()
 	
 	""" This function shows the dashboard which shows the actual working hour / official working hour for each week of the year,
@@ -116,14 +115,14 @@ class MainPage(webapp2.RequestHandler):
 	# This function returns fake 'events' similar to the events retrieved from Google Calendar.
 	def getEvents2(self, year):
 		events = {'items': [
-				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-01'}, 'end': {'date': '2015-01-01'}},
-				{'summary': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-07'}, 'end': {'date': '2015-01-07'}},
-				{'summary': 'leave', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-01-08'}, 'end': {'date': '2015-01-07'}},
-				{'summary': 'leave', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-02'}, 'end': {'date': '2015-01-07'}},
+				{'location': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-01'}, 'end': {'date': '2015-01-02'}},
+				{'location': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-06'}, 'end': {'date': '2015-01-08'}},
+				{'location': 'half', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-01-08'}, 'end': {'date': '2015-01-09'}},
+				{'location': 'leave', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-02'}, 'end': {'date': '2015-01-06'}},
 				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-02T09:00:00Z'}, 'end': {'dateTime': '2015-01-02T17:00:00Z'}},
 				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-06T11:00:00Z'}, 'end': {'dateTime': '2015-01-06T18:00:00Z'}},
 				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T15:00:00Z'}},
-				{'summary': 'holiday', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-18'}},
+				{'location': 'holiday', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-19'}},
 			]}
 		return events
 		
@@ -131,6 +130,8 @@ class MainPage(webapp2.RequestHandler):
 	def getCalendar(self, nickname, year):
 		holiday_calendar = self.initHolidayCalendar()
 		week_calendar = self.initWeekCalendar(year)
+		year_end = datetime.date(year, 12, 31)
+		one_day = datetime.timedelta(1)
 		
 		# If the nickname is 'test', then use the fake events instead of requesting Google Calendar Service
 		# Because requesting to Google Calendar doesn't work when this app is running in the AppEngine SDK environment
@@ -149,7 +150,10 @@ class MainPage(webapp2.RequestHandler):
 			for i in range(len(items)):
 			
 				# Retrieve some relevant values from the event for easy access to those values later in this function
-				summary = items[i]['summary']		# Summary (Title) of the event
+				if 'summary' in items[i]:
+					summary = items[i]['summary']		# Summary (Title) of the event
+				else:
+					summary = ''
 				if 'location' in items[i]:			# Location of the event
 					location = items[i]['location']	
 				else:
@@ -158,10 +162,13 @@ class MainPage(webapp2.RequestHandler):
 				end = items[i]['end']				# end time (or date) of the event
 				creator = items[i]['creator']		# Creator of the event
 				
+				logging.debug(start)
+				logging.debug(end)
+				
 				""" If the event is all-day event, it can fall into the following three cases
 				1. Holiday: The location (or summary) of the event will be 'holiday'
 				2. Full-day leave: The creator is on (full-day) leave at that day
-				3. Haf-day leave: The creator is on (half-day) leave at that day
+				3. Half-day leave: The creator is on (half-day) leave at that day
 				
 				This loop checks if the all-day event falls into the above three cases,
 				and then marks the element of the holiday_calendar array.
@@ -177,6 +184,7 @@ class MainPage(webapp2.RequestHandler):
 				if 'date' in start:		# Only all-day events will have 'date' field. (Other events will have 'dateTime' field instead.)
 					month = int(start['date'][5:7])
 					day = int(start['date'][8:10])
+					end_date = datetime.date(int(end['date'][0:4]), int(end['date'][5:7]), int(end['date'][8:10]))
 					
 					# type 0: weekday, type 1: half-day leave type 2: holiday or full-day leave
 					type = 0
@@ -194,14 +202,20 @@ class MainPage(webapp2.RequestHandler):
 					
 					# Update the holiday_calendar and week_calendar accordingly
 					date = datetime.date(year, month, day)
-					w = self.getWeekOfYear(year, date)
-					if w >= 0 and w < len(week_calendar):
-						if holiday_calendar[month][day] == 0:			# If the day was a weekday previously,
-							week_calendar[w][3] -= type * 4		# then we have to decrease the working hours for that week
-							holiday_calendar[month][day] = type	# and also have to mark it as the holiday.
-						elif holiday_calendar[month][day] == 1 and type == 2:	# If the day was a half-day leave and current event shows that it is holiday or full-day leave,
-							week_calendar[w][3] -= 4			# then we have to decrease the working hours by 4 for that week
-							holiday_calendar[month][day] = type	# and also have to mark it as the half-day leave
+					while type > 0 and date < end_date and date <= year_end:
+						month = date.month
+						day = date.day
+						w = self.getWeekOfYear(year, date)
+						if w >= 0 and w < len(week_calendar):
+							if holiday_calendar[month][day] == 0:			# If the day was a weekday previously,
+								week_calendar[w][3] -= type * 4		# then we have to decrease the working hours for that week
+								holiday_calendar[month][day] = type	# and also have to mark it as the holiday.
+								logging.debug('month: %d, day: %d, type: %d', month, day, type)
+							elif holiday_calendar[month][day] == 1 and type == 2:	# If the day was a half-day leave and current event shows that it is holiday or full-day leave,
+								week_calendar[w][3] -= 4			# then we have to decrease the working hours by 4 for that week
+								holiday_calendar[month][day] = type	# and also have to mark it as the half-day leave
+								logging.debug('month: %d, day: %d, type: %d', month, day, type)
+						date += one_day
 				
 				# If the event is not a full-day event and the creator is the current user, then we have to update the week_calendar accordingly
 				elif ('email' in creator) and (creator['email'] == (nickname + '@gmail.com')):
