@@ -76,7 +76,6 @@ class MainPage(webapp2.RequestHandler):
 	which is the main feature of this application. """
 	def showDashboard(self):
 		user = users.get_current_user()
-		nickname = self.request.get('user')
 		year_str = self.request.get('year')
 		if not year_str:
 			year = datetime.date.today().year
@@ -87,15 +86,22 @@ class MainPage(webapp2.RequestHandler):
 			showError(self, 'Year should be between 1900 and 9999.')
 			return
 
-		if not nickname:
+		nickname = None
+		if users.is_current_user_admin():
+			nickname = self.request.get('user')
+		if not nickname or nickname == '':
 			nickname = user.nickname()
 		
 		# Get the information from the Google Calendar
 		week_calendar = self.getCalendar(nickname, year)
 		template_values = {
 			'calendar': week_calendar,
-			'year': year
+			'year': year,
+			'user': nickname,
 		}
+		
+		if users.is_current_user_admin():
+			template_values['admin'] = True
 		
 		template = JINJA_ENVIRONMENT.get_template('index.html')
 		self.response.write(template.render(template_values))
@@ -120,8 +126,9 @@ class MainPage(webapp2.RequestHandler):
 				{'location': 'half', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-01-08'}, 'end': {'date': '2015-01-09'}},
 				{'location': 'leave', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-02'}, 'end': {'date': '2015-01-06'}},
 				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-02T09:00:00Z'}, 'end': {'dateTime': '2015-01-02T17:00:00Z'}},
-				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-06T11:00:00Z'}, 'end': {'dateTime': '2015-01-06T18:00:00Z'}},
+				{'location': 'nolunch', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-06T11:00:00Z'}, 'end': {'dateTime': '2015-01-06T18:00:00Z'}},
 				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T15:00:00Z'}},
+				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T18:00:00Z'}},
 				{'location': 'holiday', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-19'}},
 			]}
 		return events
@@ -135,7 +142,7 @@ class MainPage(webapp2.RequestHandler):
 		
 		# If the nickname is 'test', then use the fake events instead of requesting Google Calendar Service
 		# Because requesting to Google Calendar doesn't work when this app is running in the AppEngine SDK environment
-		if nickname == 'test':
+		if users.get_current_user().nickname() == 'test':
 			events = self.getEvents2(year)
 		else:
 			events = self.getEvents(year)
@@ -185,6 +192,8 @@ class MainPage(webapp2.RequestHandler):
 					month = int(start['date'][5:7])
 					day = int(start['date'][8:10])
 					end_date = datetime.date(int(end['date'][0:4]), int(end['date'][5:7]), int(end['date'][8:10]))
+					logging.debug('end_date:')
+					logging.debug(end_date)
 					
 					# type 0: weekday, type 1: half-day leave type 2: holiday or full-day leave
 					type = 0
@@ -201,12 +210,12 @@ class MainPage(webapp2.RequestHandler):
 						type = 2
 					
 					# Update the holiday_calendar and week_calendar accordingly
-					date = datetime.date(year, month, day)
+					date = datetime.date(int(start['date'][0:4]), month, day)
 					while type > 0 and date < end_date and date <= year_end:
-						month = date.month
-						day = date.day
 						w = self.getWeekOfYear(year, date)
-						if w >= 0 and w < len(week_calendar):
+						month = date.month - 1
+						day = date.day - 1
+						if w >= 0 and w < len(week_calendar) and date.weekday() <= 4:
 							if holiday_calendar[month][day] == 0:			# If the day was a weekday previously,
 								week_calendar[w][3] -= type * 4		# then we have to decrease the working hours for that week
 								holiday_calendar[month][day] = type	# and also have to mark it as the holiday.
@@ -226,6 +235,8 @@ class MainPage(webapp2.RequestHandler):
 					w = self.getWeekOfYear(year, sd)
 					if w >= 0 and w < len(week_calendar):
 						week_calendar[w][2] += timedelta.total_seconds() / 3600.0	# Increase the actual working hour for that week (by unit of hour)
+						if sdt.hour <= 12 and edt.hour >= 14 and location != 'nolunch':
+							week_calendar[w][2] -= 1.0
 						
 			""" When there are too many events in Google Calendar, then Google Calendar service will send the
 			'nextPageToken' field. We should ask REST request again with the 'pageToken' field. """

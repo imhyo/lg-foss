@@ -2,12 +2,21 @@
 
 {% block maincontent %}
 	<form name="year_form" action="/" method="post" onsubmit="return validateForm()">
-		Year: <input type="text" name="year"" autofocus>
+		{% if admin == True %}
+			User: <input type="text" name="user" value="{{ user }}"> , 
+		{% endif %}
+		Year: <input type="text" name="year" {% if admin == true %} value="{{ year }}" {% endif %} autofocus>
 		<input type="submit" value="Submit">
 	</form>
 	
 	<center><div id = "container"><table>
-	<caption>{{ year }}</caption><tr>
+	<caption>
+		{% if admin == True %}
+			{{ user }}, 
+		{% endif %}
+		{{ year }}
+	</caption>
+	<tr>
 		{% set w = 0 %}
 		{% for week in calendar %}
 			{% if w%20 == 0 %}
