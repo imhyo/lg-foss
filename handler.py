@@ -3,10 +3,12 @@ import datetime
 import jinja2
 import webapp2
 import logging
+import httplib2
 
 from google.appengine.api import users
 from apiclient.discovery import build
-from oauth2client.appengine import OAuth2Decorator
+from google.appengine.api import memcache
+from oauth2client.appengine import AppAssertionCredentials
 
 import settings
 
@@ -21,16 +23,11 @@ JINJA_ENVIRONMENT = jinja2.Environment(
 	extensions = ['jinja2.ext.autoescape'],
 	autoescape = True)
 
-''' decorator is a variable used to request the OAuth2 authentication.
-This is used to request calendar events from Google Calendar Service.
+''' The AppAssertionCredentials simplifies OAuth2.0 authentication to Google Calendar API
+Using the service accounf of this application
 '''
-decorator = OAuth2Decorator(
-	client_id=settings.CLIENT_ID,
-	client_secret=settings.CLIENT_SECRET,
-	scope=settings.SCOPE)
-
-service = build('calendar', 'v3')
-
+credentials = AppAssertionCredentials(scope=settings.SCOPE)
+http = credentials.authorize(httplib2.Http(memcache))
 
 def showError(self, message):
 	template_values = {
@@ -77,13 +74,14 @@ class MainPage(webapp2.RequestHandler):
 	def showDashboard(self):
 		user = users.get_current_user()
 		year_str = self.request.get('year')
+		current_year = datetime.date.today().year
 		if not year_str:
-			year = datetime.date.today().year
+			year = current_year
 		else:
 			year = int(year_str)
 		
-		if year < 1900 or year > 9999:
-			showError(self, 'Year should be between 1900 and 9999.')
+		if year < 1900 or year > current_year:
+			showError(self, 'Year should be between 1900 and %d.' % current_year)
 			return
 
 		nickname = None
@@ -107,19 +105,21 @@ class MainPage(webapp2.RequestHandler):
 		self.response.write(template.render(template_values))
 
 	# This function get calendar events of the 'year'
-	@decorator.oauth_required
 	def getEvents(self, year):
-		http = decorator.http()
-		timeMin = str(year) + '-01-01T00:00:00Z'
-		timeMax = str(year + 1) + '-01-01T00:00:00Z'
-		request = service.events().list(calendarId = settings.CALENDAR_ID, timeMin = timeMin, timeMax = timeMax)
-		events = request.execute(http=http)
-		return events
+		if http:
+			timeMin = str(year) + '-01-01T00:00:00Z'
+			timeMax = str(year + 1) + '-01-01T00:00:00Z'
+			service = build('calendar', 'v3', http=http)
+			request = service.events().list(calendarId = settings.CALENDAR_ID, timeMin = timeMin, timeMax = timeMax)
+			events = request.execute(http=http)
+			return events
+		else:
+			return None
 	
 	# REST request to Google Calendar doesn't work when the app is runnig in the AppEngine SDK environment.
 	# This function is the stub function which is used to test this app without deploying to the server.
 	# This function returns fake 'events' similar to the events retrieved from Google Calendar.
-	def getEvents2(self, year):
+	def getFakeEvents(self, year):
 		events = {'items': [
 				{'location': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-01'}, 'end': {'date': '2015-01-02'}},
 				{'location': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-06'}, 'end': {'date': '2015-01-08'}},
@@ -130,6 +130,7 @@ class MainPage(webapp2.RequestHandler):
 				{'summary': 'work', 'creator': {'email': 'test@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T15:00:00Z'}},
 				{'summary': 'work', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'dateTime': '2015-01-09T09:00:00Z'}, 'end': {'dateTime': '2015-01-09T18:00:00Z'}},
 				{'location': 'holiday', 'creator': {'email': 'test@gmail.com'}, 'start': {'date': '2015-02-18'}, 'end': {'date': '2015-02-19'}},
+				{'location': 'holiday', 'creator': {'email': 'hyojun.im@gmail.com'}, 'start': {'date': '2015-01-16'}, 'end': {'date': '2015-01-17'}},
 			]}
 		return events
 		
@@ -139,16 +140,17 @@ class MainPage(webapp2.RequestHandler):
 		week_calendar = self.initWeekCalendar(year)
 		year_end = datetime.date(year, 12, 31)
 		one_day = datetime.timedelta(1)
+		today = datetime.date.today()
 		
 		# If the nickname is 'test', then use the fake events instead of requesting Google Calendar Service
 		# Because requesting to Google Calendar doesn't work when this app is running in the AppEngine SDK environment
-		if users.get_current_user().nickname() == 'test':
-			events = self.getEvents2(year)
+		if self.request.host[0:9] == 'localhost':
+			events = self.getFakeEvents(year)
 		else:
 			events = self.getEvents(year)
-		
+
 		while 1:
-			if 'items' not in events:
+			if events == None or 'items' not in events:
 				break
 
 			items = events['items']
@@ -168,9 +170,6 @@ class MainPage(webapp2.RequestHandler):
 				start = items[i]['start']			# start time (or date) of the event
 				end = items[i]['end']				# end time (or date) of the event
 				creator = items[i]['creator']		# Creator of the event
-				
-				logging.debug(start)
-				logging.debug(end)
 				
 				""" If the event is all-day event, it can fall into the following three cases
 				1. Holiday: The location (or summary) of the event will be 'holiday'
@@ -192,8 +191,6 @@ class MainPage(webapp2.RequestHandler):
 					month = int(start['date'][5:7])
 					day = int(start['date'][8:10])
 					end_date = datetime.date(int(end['date'][0:4]), int(end['date'][5:7]), int(end['date'][8:10]))
-					logging.debug('end_date:')
-					logging.debug(end_date)
 					
 					# type 0: weekday, type 1: half-day leave type 2: holiday or full-day leave
 					type = 0
@@ -211,7 +208,7 @@ class MainPage(webapp2.RequestHandler):
 					
 					# Update the holiday_calendar and week_calendar accordingly
 					date = datetime.date(int(start['date'][0:4]), month, day)
-					while type > 0 and date < end_date and date <= year_end:
+					while type > 0 and date < end_date and date <= today and date <= year_end:
 						w = self.getWeekOfYear(year, date)
 						month = date.month - 1
 						day = date.day - 1
@@ -219,11 +216,9 @@ class MainPage(webapp2.RequestHandler):
 							if holiday_calendar[month][day] == 0:			# If the day was a weekday previously,
 								week_calendar[w][3] -= type * 4		# then we have to decrease the working hours for that week
 								holiday_calendar[month][day] = type	# and also have to mark it as the holiday.
-								logging.debug('month: %d, day: %d, type: %d', month, day, type)
 							elif holiday_calendar[month][day] == 1 and type == 2:	# If the day was a half-day leave and current event shows that it is holiday or full-day leave,
 								week_calendar[w][3] -= 4			# then we have to decrease the working hours by 4 for that week
 								holiday_calendar[month][day] = type	# and also have to mark it as the half-day leave
-								logging.debug('month: %d, day: %d, type: %d', month, day, type)
 						date += one_day
 				
 				# If the event is not a full-day event and the creator is the current user, then we have to update the week_calendar accordingly
@@ -335,5 +330,4 @@ class Logout(webapp2.RequestHandler):
 application = webapp2.WSGIApplication([
 	('/', MainPage),
 	('/logout', Logout),
-	(decorator.callback_path, decorator.callback_handler()),
 ], debug=True)
