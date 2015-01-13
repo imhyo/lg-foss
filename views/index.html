@@ -3,9 +3,9 @@
 {% block maincontent %}
 	<form name="year_form" action="/" method="post" onsubmit="return validateForm()">
 		{% if admin == True %}
-			User: <input type="text" name="user" value="{{ user }}"> , 
+			User: <input type="text" name="user" value="{{ user }}" autofocus> , 
 		{% endif %}
-		Year: <input type="text" name="year" {% if admin == true %} value="{{ year }}" {% endif %} autofocus>
+		Year: <input type="text" name="year" {% if admin == true %} value="{{ year }}" {% endif %}>
 		<input type="submit" value="Submit">
 	</form>
 	
