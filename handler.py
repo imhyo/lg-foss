@@ -104,18 +104,6 @@ class MainPage(webapp2.RequestHandler):
 		template = JINJA_ENVIRONMENT.get_template('index.html')
 		self.response.write(template.render(template_values))
 
-	# This function get calendar events of the 'year'
-	def getEvents(self, year):
-		if http:
-			timeMin = str(year) + '-01-01T00:00:00Z'
-			timeMax = str(year + 1) + '-01-01T00:00:00Z'
-			service = build('calendar', 'v3', http=http)
-			request = service.events().list(calendarId = settings.CALENDAR_ID, timeMin = timeMin, timeMax = timeMax)
-			events = request.execute(http=http)
-			return events
-		else:
-			return None
-	
 	# REST request to Google Calendar doesn't work when the app is runnig in the AppEngine SDK environment.
 	# This function is the stub function which is used to test this app without deploying to the server.
 	# This function returns fake 'events' similar to the events retrieved from Google Calendar.
@@ -147,7 +135,15 @@ class MainPage(webapp2.RequestHandler):
 		if self.request.host[0:9] == 'localhost':
 			events = self.getFakeEvents(year)
 		else:
-			events = self.getEvents(year)
+			if http:
+				service = build('calendar', 'v3', http=http)
+				timeMin = str(year) + '-01-01T00:00:00Z'
+				timeMax = str(year + 1) + '-01-01T00:00:00Z'
+				request = service.events().list(calendarId = settings.CALENDAR_ID, timeMin = timeMin, timeMax = timeMax)
+				events = request.execute(http=http)
+			else:
+				service = None
+				events = None
 
 		while 1:
 			if events == None or 'items' not in events:
